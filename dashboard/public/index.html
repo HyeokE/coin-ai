@@ -50,6 +50,7 @@
       .header h1 {
         font-size: 28px;
         background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+        background-clip: text;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
       }
@@ -133,6 +134,7 @@
         border: 1px solid var(--border);
         border-radius: 12px;
         padding: 20px;
+        width: 100%;
       }
 
       .chart-card h3 {
@@ -257,6 +259,7 @@
         font-family: 'SUIT Variable', sans-serif;
         font-size: 12px;
         color: var(--accent-orange);
+        white-space: nowrap;
       }
 
       .confidence-bar {
@@ -276,6 +279,7 @@
       .time-ago {
         color: var(--text-secondary);
         font-size: 12px;
+        white-space: nowrap;
       }
 
       .reasoning {
@@ -417,6 +421,7 @@
         font-family: 'SUIT Variable', sans-serif;
         font-size: 11px;
         color: var(--text-secondary);
+        white-space: nowrap;
       }
 
       .indicator-value {
@@ -431,6 +436,7 @@
         border-radius: 4px;
         font-size: 10px;
         font-weight: 600;
+        white-space: nowrap;
       }
 
       .signal-badge.atr_spike {
@@ -552,9 +558,194 @@
         font-size: 13px;
       }
 
+      .table-scroll {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
       @media (max-width: 1200px) {
         .charts-grid,
         .tables-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 14px;
+        }
+
+        .header {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .header h1 {
+          font-size: 22px;
+        }
+
+        .header-controls {
+          width: 100%;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        select,
+        button {
+          flex: 1 1 160px;
+          padding: 10px 12px;
+        }
+
+        .stat-card {
+          padding: 16px;
+        }
+
+        .stats-grid {
+          gap: 12px;
+        }
+
+        .stat-value {
+          font-size: 24px;
+        }
+
+        .chart-card {
+          padding: 16px;
+        }
+
+        .chart-container {
+          height: 240px;
+        }
+
+        .table-header {
+          padding: 14px 16px;
+          gap: 10px;
+          flex-wrap: wrap;
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .table-header h3 {
+          width: 100%;
+        }
+
+        .pager {
+          width: 100%;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          grid-template-areas:
+            'prev next'
+            'info info';
+          gap: 8px;
+        }
+
+        .pager button {
+          width: 100%;
+          white-space: nowrap;
+        }
+
+        .pager-info {
+          grid-area: info;
+          text-align: center;
+          font-size: 12px;
+          line-height: 1.2;
+          white-space: nowrap;
+        }
+
+        .pager button:nth-child(1) {
+          grid-area: prev;
+        }
+
+        .pager button:nth-child(3) {
+          grid-area: next;
+        }
+
+        .table-scroll table {
+          min-width: 900px;
+        }
+
+        th,
+        td {
+          padding: 10px 12px;
+        }
+
+        .reasoning {
+          max-width: 120px;
+        }
+
+        .modal {
+          max-width: 680px;
+          width: calc(100% - 24px);
+          max-height: 85vh;
+        }
+
+        .modal-header {
+          padding: 16px 18px;
+        }
+
+        .modal-body {
+          padding: 16px 18px;
+        }
+
+        .modal-indicators {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      @media (max-width: 420px) {
+        body {
+          padding: 10px;
+        }
+
+        .header h1 {
+          font-size: 20px;
+        }
+
+        .header-controls {
+          flex-direction: column;
+        }
+
+        select,
+        button {
+          width: 100%;
+          flex: 0 0 auto;
+        }
+
+        .stats-grid {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .stat-card {
+          padding: 12px;
+          border-radius: 10px;
+        }
+
+        .stat-label {
+          font-size: 11px;
+          margin-bottom: 6px;
+          letter-spacing: 0.3px;
+        }
+
+        .stat-value {
+          font-size: 20px;
+          line-height: 1.2;
+        }
+
+        .chart-container {
+          height: 200px;
+        }
+
+        .table-scroll table {
+          min-width: 760px;
+        }
+
+        .holding-details {
+          grid-template-columns: 1fr;
+        }
+
+        .modal-indicators {
           grid-template-columns: 1fr;
         }
       }
@@ -643,7 +834,7 @@
             <button id="evalNext" onclick="changePage('eval', 1)">Next →</button>
           </div>
         </div>
-        <div style="max-height: 400px; overflow-y: auto">
+        <div class="table-scroll" style="max-height: 400px; overflow-y: auto">
           <table id="positionEvalsTable">
             <thead>
               <tr>
@@ -673,7 +864,7 @@
             <button id="decNext" onclick="changePage('dec', 1)">Next →</button>
           </div>
         </div>
-        <div style="max-height: 400px; overflow-y: auto">
+        <div class="table-scroll" style="max-height: 400px; overflow-y: auto">
           <table id="decisionsTable">
             <thead>
               <tr>
@@ -700,7 +891,7 @@
             <button id="trNext" onclick="changePage('tr', 1)">Next →</button>
           </div>
         </div>
-        <div style="max-height: 300px; overflow-y: auto">
+        <div class="table-scroll" style="max-height: 300px; overflow-y: auto">
           <table id="tradesTable">
             <thead>
               <tr>
