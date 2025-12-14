@@ -6,6 +6,7 @@ import {
   TradeSide,
   PositionAction,
   PositionEvaluation,
+  Candle,
 } from '../types';
 import { GLOBAL_CONFIG } from '../config/config';
 import { DecisionHistory, DecisionRecord } from './DecisionHistory';
@@ -45,6 +46,12 @@ interface UnifiedDecision {
   reasoning: string;
 }
 
+export interface SuggestedEntryPlan {
+  entryPrice: number;
+  targetPrice: number;
+  stopLoss: number;
+}
+
 interface EvaluationCache {
   candleTime: number;
   evaluation: PositionEvaluation;
@@ -56,6 +63,7 @@ export class DeepSeekAgent {
   private readonly decisionHistory = new DecisionHistory(50);
   private readonly fearGreedService = new FearGreedService();
   private cachedSentiment: MarketSentiment | null = null;
+  private readonly candleContextDays = Number(process.env.AI_CANDLE_DAYS || 30);
 
   public constructor(private readonly apiKey: string) {}
 
@@ -82,6 +90,7 @@ export class DeepSeekAgent {
     sma20: number,
     ema9: number,
     portfolio: PortfolioContext,
+    suggestedEntryPlan?: SuggestedEntryPlan,
   ): Promise<AgentDecision> {
     const recentCandles = marketData.candles.slice(-10);
     const recentReturns = recentCandles.map((c, i) =>
@@ -101,27 +110,32 @@ export class DeepSeekAgent {
         ema9,
         recentReturns.slice(-5),
         portfolio,
+        marketData.candles,
+        suggestedEntryPlan,
         undefined,
         sentiment,
         recentDecisions,
       );
 
+      const resolvedEntry = raw.entryPrice ?? suggestedEntryPlan?.entryPrice ?? marketData.price;
+      const resolvedStop = raw.stopLoss ?? suggestedEntryPlan?.stopLoss ?? null;
+      const resolvedTarget = raw.targetPrice ?? suggestedEntryPlan?.targetPrice ?? null;
+
       const isBuy =
         raw.trade_mode === 'NO_POSITION' &&
         raw.action === 'BUY' &&
-        raw.entryPrice != null &&
-        raw.targetPrice != null &&
-        raw.stopLoss != null &&
-        raw.stopLoss < raw.entryPrice &&
-        raw.entryPrice < raw.targetPrice;
+        resolvedStop != null &&
+        resolvedTarget != null &&
+        resolvedStop < resolvedEntry &&
+        resolvedEntry < resolvedTarget;
 
       const decision: AgentDecision = {
         shouldTrade: isBuy,
         side: isBuy ? TradeSide.LONG : undefined,
         confidence: this.clamp(raw.confidence, 0, 100),
-        entryPrice: isBuy ? raw.entryPrice! : marketData.price,
-        targetPrice: isBuy ? raw.targetPrice! : undefined,
-        stopLoss: isBuy ? raw.stopLoss! : undefined,
+        entryPrice: isBuy ? resolvedEntry : marketData.price,
+        targetPrice: isBuy ? resolvedTarget! : undefined,
+        stopLoss: isBuy ? resolvedStop! : undefined,
         reasoning: raw.reasoning,
       };
 
@@ -151,6 +165,7 @@ export class DeepSeekAgent {
     recentReturns: number[],
     portfolio: PortfolioContext,
     candleTime: number,
+    candlesForContext?: Candle[],
   ): Promise<PositionEvaluation> {
     const cached = this.evaluationCache.get(position.symbol);
     if (cached && cached.candleTime === candleTime) {
@@ -170,6 +185,8 @@ export class DeepSeekAgent {
         ema9,
         recentReturns.slice(-5),
         portfolio,
+        candlesForContext,
+        undefined,
         currentPrice,
         sentiment,
         recentDecisions,
@@ -206,6 +223,8 @@ export class DeepSeekAgent {
     ema9: number,
     recentReturns: number[],
     portfolio: PortfolioContext,
+    candlesForContext?: Candle[],
+    suggestedEntryPlan?: SuggestedEntryPlan,
     currentPrice?: number,
     sentiment?: MarketSentiment | null,
     recentDecisions?: DecisionRecord[],
@@ -219,6 +238,8 @@ export class DeepSeekAgent {
       ema9,
       recentReturns,
       portfolio,
+      candlesForContext,
+      suggestedEntryPlan,
       currentPrice,
       sentiment,
       recentDecisions,
@@ -294,6 +315,8 @@ EXAMPLE JSON OUTPUT:
     ema9: number,
     recentReturns: number[],
     portfolio: PortfolioContext,
+    candlesForContext?: Candle[],
+    suggestedEntryPlan?: SuggestedEntryPlan,
     currentPrice?: number,
     sentiment?: MarketSentiment | null,
     recentDecisions?: DecisionRecord[],
@@ -329,6 +352,18 @@ EXAMPLE JSON OUTPUT:
           threshold: signal.threshold,
         }
       : null;
+
+    const contextCandles = candlesForContext ?? marketData?.candles ?? [];
+    const candleHistory = this.buildCandleHistory(contextCandles);
+
+    const suggestedPlanPayload =
+      suggestedEntryPlan && !position
+        ? {
+            entryPrice: suggestedEntryPlan.entryPrice,
+            targetPrice: suggestedEntryPlan.targetPrice,
+            stopLoss: suggestedEntryPlan.stopLoss,
+          }
+        : null;
 
     const positionState = position
       ? {
@@ -397,7 +432,7 @@ EXAMPLE JSON OUTPUT:
     return `You are a unified crypto trading AI.
 
 CONTEXT:
-- Timeframe: 1-hour candles (Breakout Retest strategy)
+- Timeframe: 5-minutes candles (Breakout Retest strategy)
 - Exchange: Upbit, spot, 1x (no leverage)
 - LONG only (buy then sell). SHORT is NOT allowed.
 - Fee: ${(feeRate * 100).toFixed(3)}% per trade (~${(roundTripFee * 100).toFixed(2)}% round-trip)
@@ -419,6 +454,8 @@ STATE:
   "trade_mode": "${tradeMode}",
   "market": ${JSON.stringify(marketState)},
   "signal": ${JSON.stringify(signalPayload)},
+  "candle_history": ${JSON.stringify(candleHistory)},
+  "suggested_entry_plan": ${JSON.stringify(suggestedPlanPayload)},
   "position": ${JSON.stringify(positionState)},
   "portfolio": ${JSON.stringify(portfolioState)},
   "sentiment": ${JSON.stringify(sentimentState)}
@@ -464,5 +501,32 @@ OUTPUT (JSON only):
     const num = typeof value === 'number' ? value : Number(value);
     if (!Number.isFinite(num)) return min;
     return Math.min(max, Math.max(min, num));
+  }
+
+  private buildCandleHistory(candles: Candle[]): Array<{
+    t: string;
+    o: number;
+    h: number;
+    l: number;
+    c: number;
+    v: number;
+  }> {
+    if (!candles || candles.length === 0) return [];
+
+    const candleMinutes = Number(GLOBAL_CONFIG.candleMinutes) || 60;
+    const perDay = Math.max(1, Math.floor((24 * 60) / candleMinutes));
+    const desired = Math.max(50, Math.floor(this.candleContextDays * perDay));
+    const cap = 800; // 토큰 폭주 방지 (60m 기준 30일=720)
+    const take = Math.min(candles.length, Math.min(desired, cap));
+
+    const slice = candles.slice(-take);
+    return slice.map((c) => ({
+      t: new Date(c.timestamp).toISOString().slice(0, 16), // YYYY-MM-DDTHH:MM
+      o: Number(c.open.toFixed(4)),
+      h: Number(c.high.toFixed(4)),
+      l: Number(c.low.toFixed(4)),
+      c: Number(c.close.toFixed(4)),
+      v: Number(c.volume.toFixed(4)),
+    }));
   }
 }

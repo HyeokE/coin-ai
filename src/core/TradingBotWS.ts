@@ -1,27 +1,27 @@
 import { DeepSeekAgent } from '../agent/DeepSeekAgent';
 import {
+  BREAKOUT_STRATEGY_CONFIG,
+  GLOBAL_CONFIG,
   getRiskScaleForSymbol,
   getSymbolConfig,
   getVolatilityBasedSlTp,
-  BREAKOUT_STRATEGY_CONFIG,
 } from '../config/config';
 import { UpbitService } from '../exchange/UpbitService';
+import { atrSeries, emaSeries, rsiSeries } from '../indicators';
 import { SupabaseLogger } from '../logging/SupabaseLogger';
 import { MarketDataService } from '../market/MarketDataService';
 import { OrderPlan, OrderPlanner, PortfolioState, RiskPolicy } from '../planner/OrderPlanner';
 import { RiskManager } from '../risk/RiskManager';
+import { evaluateBreakoutEntryAtIndex } from '../strategies/breakoutEntry';
 import {
   VolatilityThresholds,
   calculateEMA,
   calculatePnl,
   calculateRSI,
   calculateSMA,
-  calculateATR,
   calculateUnrealizedPnl,
   detectVolatilitySignalAt,
 } from '../trading/TradingCore';
-import { emaSeries, rsiSeries, atrSeries } from '../indicators';
-import { evaluateBreakoutEntryAtIndex } from '../strategies/breakoutEntry';
 import {
   BotConfig,
   BotState,
@@ -35,7 +35,6 @@ import {
 } from '../types';
 import { CandleData, TickerData, TradeData, UpbitWebSocket } from '../websocket/UpbitWebSocket';
 import { StateMachine } from './StateMachine';
-import { GLOBAL_CONFIG } from '../config/config';
 
 interface SymbolPosition extends Position {
   stopLoss?: number;
@@ -436,6 +435,12 @@ export class TradingBotWS {
     if (idx < 250) return;
 
     const candles = state.candles;
+    const signal = detectVolatilitySignalAt(candles, state.thresholds, idx);
+    if (!signal) {
+      console.log(`🌊 [${state.symbol}] No volatility signal, skipping breakout check`);
+      return;
+    }
+
     const closes = candles.map((c) => c.close);
     const highs = candles.map((c) => c.high);
     const lows = candles.map((c) => c.low);
@@ -457,8 +462,6 @@ export class TradingBotWS {
 
     if (!decision.shouldTrade || !decision.side) return;
 
-    state.lastAiAnalysisTime = Date.now();
-
     const rsiVal = rsi[idx];
     const sma20 = calculateSMA(candles, 20);
     const ema9 = calculateEMA(candles, 9);
@@ -472,19 +475,49 @@ export class TradingBotWS {
 
     const portfolio = await this.buildPortfolioState();
 
+    // ✅ 진입 시점 AI 호출: 브레이크아웃이 "후보"를 만들고, AI가 최종 BUY/SKIP 결정
+    if (this.isAiInCooldown(state)) {
+      console.log(`⏳ [${state.symbol}] AI cooldown active, skipping entry`);
+      return;
+    }
+    state.lastAiAnalysisTime = Date.now();
+
+    const suggestedEntryPlan =
+      decision.entryPrice && decision.stopLoss && decision.targetPrice
+        ? { entryPrice: decision.entryPrice, stopLoss: decision.stopLoss, targetPrice: decision.targetPrice }
+        : undefined;
+
+    const aiDecision = await this.agent.analyze(
+      marketData,
+      signal,
+      null,
+      rsiVal,
+      sma20,
+      ema9,
+      portfolio,
+      suggestedEntryPlan,
+    );
+
+    const combinedReasoning = `Breakout: ${decision.reasoning} | AI: ${aiDecision.reasoning}`;
+
     await this.logger.logDecision({
       symbol: state.symbol,
-      signal_type: 'BREAKOUT_RETEST',
-      signal_direction: 'LONG',
-      should_trade: decision.shouldTrade,
-      side: decision.side ?? null,
-      confidence: decision.confidence,
-      reasoning: decision.reasoning,
+      signal_type: signal.type,
+      signal_direction: signal.direction,
+      should_trade: aiDecision.shouldTrade,
+      side: aiDecision.shouldTrade ? TradeSide.LONG : null,
+      confidence: aiDecision.confidence,
+      reasoning: combinedReasoning,
       current_price: state.lastPrice,
       rsi: rsiVal,
       sma20,
       ema9,
     });
+
+    if (!aiDecision.shouldTrade) {
+      console.log(`🤖 [${state.symbol}] AI vetoed entry: ${aiDecision.reasoning}`);
+      return;
+    }
 
     const riskScale = getRiskScaleForSymbol(state.symbol);
     const price = candles[idx].close;
@@ -492,10 +525,19 @@ export class TradingBotWS {
     const customSlTp = getVolatilityBasedSlTp(state.symbol, volatilityRatio);
 
     const plan = this.planner.planOrder({
-      decision,
+      // Planner 기준 decision은 AI decision을 사용하되, 브레이크아웃 SL/TP가 있으면 우선 적용
+      decision: {
+        ...aiDecision,
+        shouldTrade: true,
+        side: TradeSide.LONG,
+        entryPrice: decision.entryPrice ?? aiDecision.entryPrice,
+        stopLoss: decision.stopLoss ?? aiDecision.stopLoss,
+        targetPrice: decision.targetPrice ?? aiDecision.targetPrice,
+        reasoning: combinedReasoning,
+      },
       marketData,
       portfolio,
-      volatility: undefined,
+      volatility: signal,
       riskScale,
       customSlTp,
     });
@@ -597,9 +639,27 @@ export class TradingBotWS {
       reason: 'NO_ACTION',
     };
 
+    // 1) 하드 스탑/익절은 AI보다 우선 (지연 없이 즉시 실행)
+    //    단, "매도 시점 AI 호출" 요구를 만족하기 위해, 실행 직전 AI 평가를 best-effort로 호출(로깅 목적)한다.
     if (stopLoss && currentPrice <= stopLoss) {
+      if (!this.isAiInCooldown(state)) {
+        state.lastAiAnalysisTime = Date.now();
+        try {
+          await this.evaluatePositionWithAI(state, currentPrice);
+        } catch (e) {
+          console.warn(`⚠️ [${state.symbol}] AI eval (STOP_LOSS) failed:`, e);
+        }
+      }
       finalAction = { action: PositionAction.CLOSE, reason: 'STOP_LOSS' };
     } else if (targetPrice && currentPrice >= targetPrice) {
+      if (!this.isAiInCooldown(state)) {
+        state.lastAiAnalysisTime = Date.now();
+        try {
+          await this.evaluatePositionWithAI(state, currentPrice);
+        } catch (e) {
+          console.warn(`⚠️ [${state.symbol}] AI eval (TAKE_PROFIT) failed:`, e);
+        }
+      }
       finalAction = { action: PositionAction.CLOSE, reason: 'TAKE_PROFIT' };
     } else {
       const beTriggerR = BREAKOUT_STRATEGY_CONFIG.beTriggerR;
@@ -612,9 +672,20 @@ export class TradingBotWS {
       }
 
       const riskAction = this.riskManager.checkPositionRisk(state.position, currentPrice);
-      if (riskAction.action === 'CLOSE') {
-        finalAction = { action: PositionAction.CLOSE, reason: riskAction.reason ?? 'RISK_TRIGGER' };
+
+      // 2) 매도(청산/부분청산) 의사결정도 AI 호출
+      let aiEval: PositionEvaluation = {
+        action: PositionAction.HOLD,
+        confidence: 0,
+        reasoning: 'AI skipped (cooldown)',
+      };
+      if (!this.isAiInCooldown(state)) {
+        state.lastAiAnalysisTime = Date.now();
+        aiEval = await this.evaluatePositionWithAI(state, currentPrice);
       }
+
+      const synthesized = this.synthesizeActions(aiEval, riskAction);
+      finalAction = { action: synthesized.action, reason: synthesized.reason };
     }
 
     if (finalAction.action === PositionAction.HOLD) return;
@@ -718,6 +789,7 @@ export class TradingBotWS {
       recentReturns,
       portfolio,
       candleTime,
+      state.candles,
     );
 
     console.log(`🧠 [${state.symbol}] AI Eval: ${evaluation.action} (${evaluation.confidence}%)`);
