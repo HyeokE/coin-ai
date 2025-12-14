@@ -19,14 +19,69 @@ jobs:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USERNAME }}
           key: ${{ secrets.OCI_SSH_KEY }}
-          port: 22
+          port: ${{ secrets.OCI_PORT || 22 }}
           script: |
-            cd ~/auto-coin
-
+            set -e  # Exit on error
+            
+            # Load environment (nvm, pnpm, pm2)
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            [ -s "$HOME/.bashrc" ] && source "$HOME/.bashrc"
+            
+            # Ensure Node.js is available
+            if ! command -v node &> /dev/null; then
+              echo "❌ Node.js not found. Please install Node.js first."
+              exit 1
+            fi
+            
+            # Ensure pnpm is available
+            if ! command -v pnpm &> /dev/null; then
+              echo "⚠️ pnpm not found in PATH. Installing globally..."
+              npm install -g pnpm || {
+                echo "❌ Failed to install pnpm"
+                exit 1
+              }
+            fi
+            
+            # Ensure PM2 is available
+            if ! command -v pm2 &> /dev/null; then
+              echo "⚠️ PM2 not found in PATH. Installing globally..."
+              npm install -g pm2 || {
+                echo "❌ Failed to install PM2"
+                exit 1
+              }
+            fi
+            
+            # Create project directory if it doesn't exist
+            PROJECT_DIR="$HOME/auto-coin"
+            if [ ! -d "$PROJECT_DIR" ]; then
+              echo "📁 Creating project directory..."
+              mkdir -p "$PROJECT_DIR"
+              cd "$PROJECT_DIR"
+              
+              # Clone repository if not a git repo
+              if [ ! -d ".git" ]; then
+                echo "📥 Cloning repository..."
+                git clone https://github.com/${{ github.repository }}.git .
+              fi
+            else
+              cd "$PROJECT_DIR"
+            fi
+            
+            # Ensure it's a git repository
+            if [ ! -d ".git" ]; then
+              echo "❌ Not a git repository. Initializing..."
+              git init
+              git remote add origin https://github.com/${{ github.repository }}.git || true
+            fi
+            
             echo "📥 Pulling latest code..."
-            git fetch origin main
-            git reset --hard origin/main
-
+            git fetch origin main || git fetch origin master
+            git reset --hard origin/main || git reset --hard origin/master
+            
+            # Create logs directory
+            mkdir -p logs
+            
             echo "🔐 Creating .env file..."
             cat > .env << 'EOF'
             UPBIT_ACCESS_KEY=${{ secrets.UPBIT_ACCESS_KEY }}
@@ -44,7 +99,7 @@ jobs:
             EOF
 
             echo "📦 Installing dependencies..."
-            pnpm install --frozen-lockfile
+            pnpm install --frozen-lockfile || pnpm install
 
             echo "🔨 Building..."
             pnpm build
