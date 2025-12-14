@@ -8,4 +8,5 @@ coverage/
 .pnpm-store/
 .claude/
 CLAUDE.MD
-
+*.key
+*.key.pub

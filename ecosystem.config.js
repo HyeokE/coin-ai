@@ -8,6 +8,8 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '500M',
+      interpreter: 'node',
+      interpreter_args: '-r dotenv/config',
       env: {
         NODE_ENV: 'production',
       },
@@ -23,6 +25,8 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '300M',
+      interpreter: 'node',
+      interpreter_args: '-r dotenv/config',
       env: {
         NODE_ENV: 'production',
         DASHBOARD_PORT: 3001,
