@@ -152,6 +152,29 @@
         gap: 24px;
       }
 
+      .pager {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .pager button {
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+
+      .pager button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .pager-info {
+        color: var(--text-secondary);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
       .table-card {
         background: var(--bg-secondary);
         border: 1px solid var(--border);
@@ -614,6 +637,11 @@
       <div class="table-card" style="grid-column: 1 / -1">
         <div class="table-header">
           <h3>🧠 Position Evaluations</h3>
+          <div class="pager">
+            <button id="evalPrev" onclick="changePage('eval', -1)">← Prev</button>
+            <div class="pager-info" id="evalPagerInfo">-</div>
+            <button id="evalNext" onclick="changePage('eval', 1)">Next →</button>
+          </div>
         </div>
         <div style="max-height: 400px; overflow-y: auto">
           <table id="positionEvalsTable">
@@ -639,6 +667,11 @@
       <div class="table-card" style="grid-column: 1 / -1">
         <div class="table-header">
           <h3>🤖 Recent AI Decisions (Entry)</h3>
+          <div class="pager">
+            <button id="decPrev" onclick="changePage('dec', -1)">← Prev</button>
+            <div class="pager-info" id="decPagerInfo">-</div>
+            <button id="decNext" onclick="changePage('dec', 1)">Next →</button>
+          </div>
         </div>
         <div style="max-height: 400px; overflow-y: auto">
           <table id="decisionsTable">
@@ -661,6 +694,11 @@
       <div class="table-card" style="grid-column: 1 / -1">
         <div class="table-header">
           <h3>💰 Recent Trades</h3>
+          <div class="pager">
+            <button id="trPrev" onclick="changePage('tr', -1)">← Prev</button>
+            <div class="pager-info" id="trPagerInfo">-</div>
+            <button id="trNext" onclick="changePage('tr', 1)">Next →</button>
+          </div>
         </div>
         <div style="max-height: 300px; overflow-y: auto">
           <table id="tradesTable">
@@ -748,6 +786,13 @@
     <script>
       let equityChart, dailyPnlChart;
       const API_BASE = '';
+      const PAGE_SIZE = 50;
+
+      const paging = {
+        dec: { page: 1, totalPages: 1, total: 0 },
+        tr: { page: 1, totalPages: 1, total: 0 },
+        eval: { page: 1, totalPages: 1, total: 0 },
+      };
 
       async function fetchData(endpoint) {
         const res = await fetch(API_BASE + endpoint);
@@ -963,7 +1008,12 @@
 
       async function loadDecisions() {
         const symbol = document.getElementById('symbolFilter').value;
-        decisionsData = await fetchData(`/api/decisions?limit=50&symbol=${symbol}`);
+        const resp = await fetchData(
+          `/api/decisions?limit=${PAGE_SIZE}&page=${paging.dec.page}&symbol=${symbol}`,
+        );
+        decisionsData = resp.data || [];
+        paging.dec.totalPages = resp.totalPages || 1;
+        paging.dec.total = resp.total || 0;
 
         const tbody = document.querySelector('#decisionsTable tbody');
         tbody.innerHTML = decisionsData
@@ -994,6 +1044,8 @@
       `,
           )
           .join('');
+
+        updatePagerUI('dec');
       }
 
       function truncate(str, len) {
@@ -1059,7 +1111,10 @@
 
       async function loadTrades() {
         const symbol = document.getElementById('symbolFilter').value;
-        const data = await fetchData(`/api/trades?limit=50&symbol=${symbol}`);
+        const resp = await fetchData(`/api/trades?limit=${PAGE_SIZE}&page=${paging.tr.page}&symbol=${symbol}`);
+        const data = resp.data || [];
+        paging.tr.totalPages = resp.totalPages || 1;
+        paging.tr.total = resp.total || 0;
 
         const tbody = document.querySelector('#tradesTable tbody');
         tbody.innerHTML = data
@@ -1080,13 +1135,20 @@
       `,
           )
           .join('');
+
+        updatePagerUI('tr');
       }
 
       let positionEvalsData = [];
 
       async function loadPositionEvals() {
         const symbol = document.getElementById('symbolFilter').value;
-        positionEvalsData = await fetchData(`/api/position-evals?limit=50&symbol=${symbol}`);
+        const resp = await fetchData(
+          `/api/position-evals?limit=${PAGE_SIZE}&page=${paging.eval.page}&symbol=${symbol}`,
+        );
+        positionEvalsData = resp.data || [];
+        paging.eval.totalPages = resp.totalPages || 1;
+        paging.eval.total = resp.total || 0;
 
         const tbody = document.querySelector('#positionEvalsTable tbody');
         tbody.innerHTML = positionEvalsData
@@ -1112,6 +1174,43 @@
       `,
           )
           .join('');
+
+        updatePagerUI('eval');
+      }
+
+      function updatePagerUI(key) {
+        if (key === 'dec') {
+          document.getElementById('decPagerInfo').textContent =
+            `Page ${paging.dec.page} / ${paging.dec.totalPages} · Total ${paging.dec.total}`;
+          document.getElementById('decPrev').disabled = paging.dec.page <= 1;
+          document.getElementById('decNext').disabled = paging.dec.page >= paging.dec.totalPages;
+          return;
+        }
+        if (key === 'tr') {
+          document.getElementById('trPagerInfo').textContent =
+            `Page ${paging.tr.page} / ${paging.tr.totalPages} · Total ${paging.tr.total}`;
+          document.getElementById('trPrev').disabled = paging.tr.page <= 1;
+          document.getElementById('trNext').disabled = paging.tr.page >= paging.tr.totalPages;
+          return;
+        }
+        if (key === 'eval') {
+          document.getElementById('evalPagerInfo').textContent =
+            `Page ${paging.eval.page} / ${paging.eval.totalPages} · Total ${paging.eval.total}`;
+          document.getElementById('evalPrev').disabled = paging.eval.page <= 1;
+          document.getElementById('evalNext').disabled = paging.eval.page >= paging.eval.totalPages;
+        }
+      }
+
+      async function changePage(key, delta) {
+        if (!paging[key]) return;
+        const next = paging[key].page + delta;
+        if (next < 1) return;
+        if (next > (paging[key].totalPages || 1)) return;
+        paging[key].page = next;
+
+        if (key === 'dec') return loadDecisions();
+        if (key === 'tr') return loadTrades();
+        if (key === 'eval') return loadPositionEvals();
       }
 
       function openPositionEvalModal(index) {
@@ -1168,6 +1267,9 @@
 
       document.getElementById('timeRange').addEventListener('change', refreshData);
       document.getElementById('symbolFilter').addEventListener('change', () => {
+        paging.dec.page = 1;
+        paging.tr.page = 1;
+        paging.eval.page = 1;
         loadPositionEvals();
         loadDecisions();
         loadTrades();

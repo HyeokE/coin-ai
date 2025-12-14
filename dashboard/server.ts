@@ -101,66 +101,84 @@ app.get('/api/prices', async (req, res) => {
 });
 
 app.get('/api/decisions', async (req, res) => {
-  if (!supabase) return res.json([]);
-
-  const limit = parseInt(req.query.limit as string) || 50;
+  const limit = Math.max(1, Math.min(parseInt(req.query.limit as string) || 50, 200));
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
   const symbol = req.query.symbol as string;
+
+  if (!supabase) return res.json({ data: [], page, limit, total: 0, totalPages: 1 });
 
   let query = supabase
     .from('decision_logs')
-    .select('*')
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(from, to);
 
   if (symbol && symbol !== 'all') {
     query = query.eq('symbol', symbol);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data || []);
+
+  const total = count ?? 0;
+  const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
+  res.json({ data: data || [], page, limit, total, totalPages });
 });
 
 app.get('/api/trades', async (req, res) => {
-  if (!supabase) return res.json([]);
-
-  const limit = parseInt(req.query.limit as string) || 50;
+  const limit = Math.max(1, Math.min(parseInt(req.query.limit as string) || 50, 200));
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
   const symbol = req.query.symbol as string;
+
+  if (!supabase) return res.json({ data: [], page, limit, total: 0, totalPages: 1 });
 
   let query = supabase
     .from('trade_logs')
-    .select('*')
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(from, to);
 
   if (symbol && symbol !== 'all') {
     query = query.eq('symbol', symbol);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data || []);
+
+  const total = count ?? 0;
+  const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
+  res.json({ data: data || [], page, limit, total, totalPages });
 });
 
 app.get('/api/position-evals', async (req, res) => {
-  if (!supabase) return res.json([]);
-
-  const limit = parseInt(req.query.limit as string) || 50;
+  const limit = Math.max(1, Math.min(parseInt(req.query.limit as string) || 50, 200));
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
   const symbol = req.query.symbol as string;
+
+  if (!supabase) return res.json({ data: [], page, limit, total: 0, totalPages: 1 });
 
   let query = supabase
     .from('position_eval_logs')
-    .select('*')
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(from, to);
 
   if (symbol && symbol !== 'all') {
     query = query.eq('symbol', symbol);
   }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data || []);
+
+  const total = count ?? 0;
+  const totalPages = total > 0 ? Math.ceil(total / limit) : 1;
+  res.json({ data: data || [], page, limit, total, totalPages });
 });
 
 app.get('/api/stats', async (req, res) => {
