@@ -362,7 +362,7 @@ function computeWalkForwardReport(args: {
 }
 
 async function testBreakout(symbol: string): Promise<TestResult> {
-  const candleMinutes = parseInt(process.env.TF || '60', 10) as CandleUnit;
+  const candleMinutes = parseInt(process.env.TF || String(GLOBAL_CONFIG.candleMinutes), 10) as CandleUnit;
   const candleCount = parseInt(process.env.CANDLE_COUNT || '30000', 10);
   const mode = (process.env.MODE || 'immediate') as BreakoutMode;
   const retestLookback = parseInt(process.env.RETEST_LOOKBACK || '5', 10);
@@ -447,6 +447,8 @@ async function testBreakout(symbol: string): Promise<TestResult> {
     },
     feeRate,
     beTriggerR,
+    // ✅ 라이브(TradingBotWS)와 동일: 변동성 시그널이 있어야만 진입 의사결정(AI/전략) 호출
+    gateOnSignal: true,
   });
 
   const result = sim.run(candles, wrappedProvider);
@@ -522,9 +524,8 @@ async function testBreakout(symbol: string): Promise<TestResult> {
 
 async function main() {
   const symbols = (process.env.SYMBOLS || 'KRW-BTC').split(',').map((s) => s.trim());
-  const tfLabel = parseInt(process.env.TF || '60', 10) >= 60 
-    ? `${parseInt(process.env.TF || '60', 10) / 60}H` 
-    : `${process.env.TF || '60'}m`;
+  const tf = parseInt(process.env.TF || String(GLOBAL_CONFIG.candleMinutes), 10);
+  const tfLabel = tf >= 60 ? `${tf / 60}H` : `${tf}m`;
   const mode = process.env.MODE || 'immediate';
 
   console.log('═══════════════════════════════════════════');

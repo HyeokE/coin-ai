@@ -258,6 +258,8 @@ function runBacktestWithParams(args: {
     volatilityThresholds: thresholds,
     feeRate,
     beTriggerR: strategy.beTriggerR,
+    // 래퍼(wrapDecisionProviderForOptimization)와 동기화: 최적화 설정에 따라 gate 여부 결정
+    gateOnSignal: OPTIMIZATION_CONFIG.gateOnSignal,
   };
 
   const sim = new BacktestSimulator(config);

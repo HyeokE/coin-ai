@@ -1,7 +1,7 @@
 import { getSymbolRiskPolicy, GLOBAL_CONFIG } from '../config/config';
 import { MarketDataService } from '../market/MarketDataService';
-import { Candle, VolatilitySignal } from '../types';
-import { BacktestSimulator, BacktestResult, DecisionProvider, SimulatedPosition } from './BacktestSimulator';
+import { Candle } from '../types';
+import { BacktestSimulator } from './BacktestSimulator';
 import { emaSeries, rsiSeries, atrSeries } from '../indicators';
 import { createBreakoutStrategyProvider } from './strategies/breakoutStrategy';
 import { BreakoutMode } from '../strategies/breakoutEntry';
@@ -63,7 +63,10 @@ function createFolds(n: number, k: number): { start: number; end: number }[] {
 }
 
 async function optimizeSymbol(symbol: string) {
-  const candleMinutes = parseInt(process.env.TF || '60', 10) as CandleUnit;
+  const candleMinutes = parseInt(
+    process.env.TF || String(GLOBAL_CONFIG.candleMinutes),
+    10,
+  ) as CandleUnit;
   const candleCount = parseInt(process.env.CANDLE_COUNT || '30000', 10);
   const tfLabel = candleMinutes >= 60 ? `${candleMinutes / 60}H` : `${candleMinutes}m`;
 
@@ -137,6 +140,8 @@ async function optimizeSymbol(symbol: string) {
         },
         feeRate,
         beTriggerR: params.beTrigger,
+        // ✅ 라이브(TradingBotWS)와 동일: 변동성 시그널이 있어야만 진입 의사결정(AI/전략) 호출
+        gateOnSignal: true,
       });
 
       const result = sim.runRange(candles, fold.start, fold.end, provider);
@@ -224,7 +229,7 @@ async function main() {
   console.log('   🚀 Breakout Strategy Optimization');
   console.log('═══════════════════════════════════════════════════════════════');
   console.log(`   Symbols: ${symbols.join(', ')}`);
-  console.log(`   TF: ${process.env.TF || '60'}min`);
+  console.log(`   TF: ${process.env.TF || String(GLOBAL_CONFIG.candleMinutes)}min`);
 
   for (const symbol of symbols) {
     await optimizeSymbol(symbol);

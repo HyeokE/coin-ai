@@ -137,6 +137,8 @@ async function runBacktestForSymbol(
     riskPolicy: getSymbolRiskPolicy(symbol),
     volatilityThresholds: getSymbolThresholds(symbol, candleType),
     feeRate: GLOBAL_CONFIG.feeRate,
+    // ✅ 라이브(TradingBotWS)와 동일: 변동성 시그널이 있어야만 진입 의사결정(AI/전략) 호출
+    gateOnSignal: true,
   };
 
   const simulator = new BacktestSimulator(config);

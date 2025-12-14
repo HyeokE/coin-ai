@@ -2,6 +2,23 @@ import { BotConfig } from '../types';
 import { RiskPolicy } from '../planner/OrderPlanner';
 import { CandleUnit } from '../models/upbit';
 
+const ALLOWED_CANDLE_UNITS: CandleUnit[] = [1, 3, 5, 15, 30, 60, 240];
+
+function resolveCandleMinutesFromEnv(defaultUnit: CandleUnit = 60): CandleUnit {
+  const raw = process.env.TF ?? process.env.CANDLE_MINUTES;
+  if (!raw) return defaultUnit;
+
+  const n = Number(raw);
+  if (Number.isFinite(n) && ALLOWED_CANDLE_UNITS.includes(n as CandleUnit)) {
+    return n as CandleUnit;
+  }
+
+  console.warn(
+    `⚠️ Invalid TF/CANDLE_MINUTES="${raw}". Allowed: ${ALLOWED_CANDLE_UNITS.join(', ')}. Using ${defaultUnit}.`,
+  );
+  return defaultUnit;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Optimization Config (최적화 설정)
 // ═══════════════════════════════════════════════════════════════════
@@ -147,7 +164,7 @@ export const GLOBAL_CONFIG: GlobalConfig = {
   maxNotionalKrw: 2_000_000,
   intervalMs: 20_000,
   cooldownMs: 45_000,
-  candleMinutes: 60,
+  candleMinutes: resolveCandleMinutesFromEnv(60),
   feeRate: 0.0005,
 };
 

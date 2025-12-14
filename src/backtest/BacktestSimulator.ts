@@ -10,6 +10,12 @@ export interface BacktestConfig {
   volatilityThresholds: VolatilityThresholds;
   feeRate: number;
   beTriggerR?: number;
+  /**
+   * 라이브(TradingBotWS)와 동일하게 "변동성 시그널이 있어야만" 진입 의사결정(AI/전략)을 호출한다.
+   * - true(기본): signal 없으면 decisionProvider 호출 자체를 스킵
+   * - false: signal이 없어도 decisionProvider에 null signal을 전달하여 매 캔들 평가
+   */
+  gateOnSignal?: boolean;
   signalExitMinHoldBars?: number;
   signalExitAfterBeOnly?: boolean;
 }
@@ -104,6 +110,7 @@ export class BacktestSimulator {
     this.reset();
 
     const beTriggerR = this.config.beTriggerR ?? 0.25;
+    const gateOnSignal = this.config.gateOnSignal ?? false;
     const WINDOW = 300;
 
     const start = Math.max(startIdx, 250);
@@ -164,6 +171,7 @@ export class BacktestSimulator {
       const signal = detectVolatilitySignal(candlesWindow, this.config.volatilityThresholds);
       if (!signal) {
         this.debugStats.noSignal++;
+        if (gateOnSignal) continue; // ✅ live와 동일: signal 없으면 AI/전략 호출 스킵
       } else {
         this.signalCount++;
       }
