@@ -1,0 +1,1180 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🤖 Auto Coin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+      href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-primary: #0d1117;
+        --bg-secondary: #161b22;
+        --bg-tertiary: #21262d;
+        --text-primary: #f0f6fc;
+        --text-secondary: #8b949e;
+        --accent-green: #3fb950;
+        --accent-red: #f85149;
+        --accent-blue: #58a6ff;
+        --accent-purple: #bc8cff;
+        --accent-orange: #f0883e;
+        --border: #30363d;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'SUIT Variable', sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 32px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .header h1 {
+        font-size: 28px;
+        background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+
+      .header-controls {
+        display: flex;
+        gap: 12px;
+      }
+
+      select,
+      button {
+        font-family: inherit;
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      select:hover,
+      button:hover {
+        border-color: var(--accent-blue);
+      }
+
+      button.primary {
+        background: var(--accent-blue);
+        border-color: var(--accent-blue);
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 32px;
+      }
+
+      .stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        transition: transform 0.2s;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-2px);
+      }
+
+      .stat-label {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .stat-value {
+        font-size: 32px;
+        font-weight: 700;
+        font-family: 'SUIT Variable', sans-serif;
+      }
+
+      .stat-value.positive {
+        color: var(--accent-green);
+      }
+      .stat-value.negative {
+        color: var(--accent-red);
+      }
+
+      .charts-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 24px;
+        margin-bottom: 32px;
+      }
+
+      .chart-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+      }
+
+      .chart-card h3 {
+        margin-bottom: 16px;
+        font-size: 16px;
+        color: var(--text-secondary);
+      }
+
+      .chart-container {
+        position: relative;
+        height: 300px;
+      }
+
+      .tables-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+      }
+
+      .table-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+
+      .table-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .table-header h3 {
+        font-size: 16px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        padding: 12px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+
+      th {
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+      }
+
+      tr:hover {
+        background: var(--bg-tertiary);
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+
+      .badge.long {
+        background: rgba(63, 185, 80, 0.2);
+        color: var(--accent-green);
+      }
+      .badge.short {
+        background: rgba(248, 81, 73, 0.2);
+        color: var(--accent-red);
+      }
+      .badge.open {
+        background: rgba(88, 166, 255, 0.2);
+        color: var(--accent-blue);
+      }
+      .badge.close {
+        background: rgba(188, 140, 255, 0.2);
+        color: var(--accent-purple);
+      }
+
+      .pnl.positive {
+        color: var(--accent-green);
+      }
+      .pnl.negative {
+        color: var(--accent-red);
+      }
+
+      .symbol-tag {
+        font-family: 'SUIT Variable', sans-serif;
+        font-size: 12px;
+        color: var(--accent-orange);
+      }
+
+      .confidence-bar {
+        width: 60px;
+        height: 6px;
+        background: var(--bg-tertiary);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .confidence-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s;
+      }
+
+      .time-ago {
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+
+      .reasoning {
+        max-width: 180px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--accent-blue);
+        text-decoration: underline;
+        text-decoration-style: dotted;
+      }
+
+      .reasoning:hover {
+        color: var(--accent-purple);
+      }
+
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s;
+      }
+
+      .modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .modal {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        transform: scale(0.9);
+        transition: transform 0.2s;
+      }
+
+      .modal-overlay.active .modal {
+        transform: scale(1);
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .modal-header h3 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 24px;
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 6px;
+        transition: all 0.2s;
+      }
+
+      .modal-close:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+      }
+
+      .modal-body {
+        padding: 24px;
+      }
+
+      .modal-section {
+        margin-bottom: 20px;
+      }
+
+      .modal-section:last-child {
+        margin-bottom: 0;
+      }
+
+      .modal-section-title {
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+      }
+
+      .modal-section-content {
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--text-primary);
+      }
+
+      .modal-indicators {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .modal-indicator {
+        background: var(--bg-tertiary);
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+      }
+
+      .modal-indicator-label {
+        font-size: 11px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+
+      .modal-indicator-value {
+        font-family: 'SUIT Variable', sans-serif;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .indicator {
+        font-family: 'SUIT Variable', sans-serif;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+
+      .indicator-value {
+        color: var(--text-primary);
+      }
+
+      .signal-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      .signal-badge.atr_spike {
+        background: rgba(240, 136, 62, 0.2);
+        color: var(--accent-orange);
+      }
+      .signal-badge.price_surge {
+        background: rgba(88, 166, 255, 0.2);
+        color: var(--accent-blue);
+      }
+      .signal-badge.volume_spike {
+        background: rgba(188, 140, 255, 0.2);
+        color: var(--accent-purple);
+      }
+      .signal-badge.up {
+        border: 1px solid var(--accent-green);
+      }
+      .signal-badge.down {
+        border: 1px solid var(--accent-red);
+      }
+
+      .price-cell {
+        font-family: 'SUIT Variable', sans-serif;
+        font-size: 12px;
+      }
+
+      .holdings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+      }
+
+      .holding-card {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .holding-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .holding-symbol {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--accent-orange);
+        font-family: 'SUIT Variable', sans-serif;
+      }
+
+      .holding-pnl {
+        font-size: 14px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 6px;
+      }
+
+      .holding-pnl.positive {
+        background: rgba(63, 185, 80, 0.2);
+        color: var(--accent-green);
+      }
+
+      .holding-pnl.negative {
+        background: rgba(248, 81, 73, 0.2);
+        color: var(--accent-red);
+      }
+
+      .holding-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        font-size: 13px;
+      }
+
+      .holding-detail {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .holding-detail-label {
+        color: var(--text-secondary);
+        font-size: 11px;
+        text-transform: uppercase;
+      }
+
+      .holding-detail-value {
+        font-family: 'SUIT Variable', sans-serif;
+        color: var(--text-primary);
+      }
+
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 200px;
+        color: var(--text-secondary);
+      }
+
+      .symbol-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      .symbol-chip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        font-size: 13px;
+      }
+
+      @media (max-width: 1200px) {
+        .charts-grid,
+        .tables-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>🤖 Auto Coin Trading Dashboard</h1>
+      <div class="header-controls">
+        <select id="symbolFilter">
+          <option value="all">All Symbols</option>
+        </select>
+        <select id="timeRange">
+          <option value="1">Last 24h</option>
+          <option value="7" selected>Last 7 days</option>
+          <option value="30">Last 30 days</option>
+        </select>
+        <button class="primary" onclick="refreshData()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <div class="stat-label">💰 Total Equity</div>
+        <div class="stat-value" id="totalEquity">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">💵 Cash (KRW)</div>
+        <div class="stat-value" id="cashKrw">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">📦 Holdings</div>
+        <div class="stat-value" id="holdingsValue">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Trades</div>
+        <div class="stat-value" id="totalTrades">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="winRate">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total PnL</div>
+        <div class="stat-value" id="totalPnl">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">AI Decisions</div>
+        <div class="stat-value" id="totalDecisions">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Trade Rate</div>
+        <div class="stat-value" id="tradeRate">-</div>
+      </div>
+    </div>
+
+    <div class="holdings-section" id="holdingsSection" style="margin-bottom: 32px; display: none">
+      <div class="chart-card">
+        <h3 style="margin-bottom: 16px">📦 Current Holdings</h3>
+        <div class="holdings-grid" id="holdingsGrid"></div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>📈 Equity Curve</h3>
+        <div class="chart-container">
+          <canvas id="equityChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>📊 Daily PnL</h3>
+        <div class="chart-container">
+          <canvas id="dailyPnlChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="tables-grid">
+      <div class="table-card" style="grid-column: 1 / -1">
+        <div class="table-header">
+          <h3>🧠 Position Evaluations</h3>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto">
+          <table id="positionEvalsTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Action</th>
+                <th>Conf</th>
+                <th>Price</th>
+                <th>Entry</th>
+                <th>Gross PnL</th>
+                <th>Net PnL</th>
+                <th>Hold Time</th>
+                <th>RSI</th>
+                <th>Reasoning</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="table-card" style="grid-column: 1 / -1">
+        <div class="table-header">
+          <h3>🤖 Recent AI Decisions (Entry)</h3>
+        </div>
+        <div style="max-height: 400px; overflow-y: auto">
+          <table id="decisionsTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Price</th>
+                <th>Indicators</th>
+                <th>Signal</th>
+                <th>Decision</th>
+                <th>Conf</th>
+                <th>AI Reasoning</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="table-card" style="grid-column: 1 / -1">
+        <div class="table-header">
+          <h3>💰 Recent Trades</h3>
+        </div>
+        <div style="max-height: 300px; overflow-y: auto">
+          <table id="tradesTable">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th>Action</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>PnL</th>
+                <th>Exit Reason</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Decision Detail Modal -->
+    <div class="modal-overlay" id="decisionModal" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>
+            <span id="modalSymbol" class="symbol-tag"></span>
+            <span id="modalSignal"></span>
+          </h3>
+          <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-section">
+            <div class="modal-section-title">📊 Indicators</div>
+            <div class="modal-indicators">
+              <div class="modal-indicator">
+                <div class="modal-indicator-label">Price</div>
+                <div class="modal-indicator-value" id="modalPrice">-</div>
+              </div>
+              <div class="modal-indicator">
+                <div class="modal-indicator-label">RSI (14)</div>
+                <div class="modal-indicator-value" id="modalRsi">-</div>
+              </div>
+              <div class="modal-indicator">
+                <div class="modal-indicator-label">SMA (20)</div>
+                <div class="modal-indicator-value" id="modalSma">-</div>
+              </div>
+              <div class="modal-indicator">
+                <div class="modal-indicator-label">EMA (9)</div>
+                <div class="modal-indicator-value" id="modalEma">-</div>
+              </div>
+              <div class="modal-indicator">
+                <div class="modal-indicator-label">Confidence</div>
+                <div class="modal-indicator-value" id="modalConfidence">-</div>
+              </div>
+              <div class="modal-indicator">
+                <div class="modal-indicator-label">Decision</div>
+                <div class="modal-indicator-value" id="modalDecision">-</div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-section">
+            <div class="modal-section-title">🤖 AI Reasoning</div>
+            <div
+              class="modal-section-content"
+              id="modalReasoning"
+              style="
+                background: var(--bg-tertiary);
+                padding: 16px;
+                border-radius: 8px;
+                white-space: pre-wrap;
+              "
+            >
+              -
+            </div>
+          </div>
+          <div class="modal-section">
+            <div class="modal-section-title">🕐 Time</div>
+            <div class="modal-section-content" id="modalTime">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let equityChart, dailyPnlChart;
+      const API_BASE = '';
+
+      async function fetchData(endpoint) {
+        const res = await fetch(API_BASE + endpoint);
+        return res.json();
+      }
+
+      function timeAgo(dateStr) {
+        const now = new Date();
+        const date = new Date(dateStr);
+        const diff = Math.floor((now - date) / 1000);
+
+        if (diff < 60) return `${diff}s ago`;
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return `${Math.floor(diff / 86400)}d ago`;
+      }
+
+      function formatNumber(num) {
+        return new Intl.NumberFormat('ko-KR').format(num);
+      }
+
+      async function loadBalance() {
+        try {
+          const data = await fetchData('/api/balance');
+          document.getElementById('totalEquity').textContent =
+            formatNumber(Math.round(data.totalEquity)) + ' ₩';
+          document.getElementById('cashKrw').textContent =
+            formatNumber(Math.round(data.cashKrw)) + ' ₩';
+          document.getElementById('holdingsValue').textContent =
+            formatNumber(Math.round(data.holdingsValue)) + ' ₩';
+
+          // 보유 종목 표시
+          const holdingsSection = document.getElementById('holdingsSection');
+          const holdingsGrid = document.getElementById('holdingsGrid');
+
+          if (data.holdings && data.holdings.length > 0) {
+            holdingsSection.style.display = 'block';
+
+            // 현재가 가져오기
+            const symbols = data.holdings.map((h) => 'KRW-' + h.currency);
+            let prices = {};
+            try {
+              const priceData = await fetchData('/api/prices?symbols=' + symbols.join(','));
+              prices = priceData || {};
+            } catch (e) {
+              console.log('Failed to fetch prices');
+            }
+
+            holdingsGrid.innerHTML = data.holdings
+              .map((h) => {
+                const symbol = 'KRW-' + h.currency;
+                const currentPrice = prices[symbol] || h.avgBuyPrice;
+                const currentValue = h.balance * currentPrice;
+                const pnl = currentValue - h.value;
+                const pnlPct = h.value > 0 ? (pnl / h.value) * 100 : 0;
+                const isProfitable = pnl >= 0;
+
+                return `
+                  <div class="holding-card">
+                    <div class="holding-header">
+                      <span class="holding-symbol">${h.currency}</span>
+                      <span class="holding-pnl ${isProfitable ? 'positive' : 'negative'}">
+                        ${isProfitable ? '+' : ''}${pnlPct.toFixed(2)}%
+                      </span>
+                    </div>
+                    <div class="holding-details">
+                      <div class="holding-detail">
+                        <span class="holding-detail-label">수량</span>
+                        <span class="holding-detail-value">${h.balance.toFixed(6)}</span>
+                      </div>
+                      <div class="holding-detail">
+                        <span class="holding-detail-label">현재가</span>
+                        <span class="holding-detail-value">${formatNumber(Math.round(currentPrice))}</span>
+                      </div>
+                      <div class="holding-detail">
+                        <span class="holding-detail-label">평균 매수가</span>
+                        <span class="holding-detail-value">${formatNumber(Math.round(h.avgBuyPrice))}</span>
+                      </div>
+                      <div class="holding-detail">
+                        <span class="holding-detail-label">평가금액</span>
+                        <span class="holding-detail-value">${formatNumber(Math.round(currentValue))} ₩</span>
+                      </div>
+                      <div class="holding-detail">
+                        <span class="holding-detail-label">매수금액</span>
+                        <span class="holding-detail-value">${formatNumber(Math.round(h.value))} ₩</span>
+                      </div>
+                      <div class="holding-detail">
+                        <span class="holding-detail-label">평가손익</span>
+                        <span class="holding-detail-value ${isProfitable ? 'positive' : 'negative'}">
+                          ${isProfitable ? '+' : ''}${formatNumber(Math.round(pnl))} ₩
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              })
+              .join('');
+          } else {
+            holdingsSection.style.display = 'none';
+          }
+        } catch (e) {
+          document.getElementById('totalEquity').textContent = '-';
+          document.getElementById('cashKrw').textContent = '-';
+          document.getElementById('holdingsValue').textContent = '-';
+        }
+      }
+
+      async function loadStats() {
+        const days = document.getElementById('timeRange').value;
+        const stats = await fetchData(`/api/stats?days=${days}`);
+
+        document.getElementById('totalTrades').textContent = stats.totalTrades;
+        document.getElementById('winRate').textContent = stats.winRate + '%';
+
+        const pnlEl = document.getElementById('totalPnl');
+        const pnl = parseFloat(stats.totalPnl);
+        pnlEl.textContent = (pnl >= 0 ? '+' : '') + formatNumber(pnl) + ' ₩';
+        pnlEl.className = 'stat-value ' + (pnl >= 0 ? 'positive' : 'negative');
+
+        document.getElementById('totalDecisions').textContent = stats.totalDecisions;
+        document.getElementById('tradeRate').textContent = stats.tradeRate + '%';
+
+        // Populate symbol filter
+        const symbols = Object.keys(stats.bySymbol);
+        const select = document.getElementById('symbolFilter');
+        select.innerHTML = '<option value="all">All Symbols</option>';
+        symbols.forEach((s) => {
+          select.innerHTML += `<option value="${s}">${s}</option>`;
+        });
+      }
+
+      async function loadEquityCurve() {
+        const data = await fetchData('/api/equity-curve');
+
+        if (equityChart) equityChart.destroy();
+
+        const ctx = document.getElementById('equityChart').getContext('2d');
+        equityChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: data.map((d) => new Date(d.date).toLocaleDateString('ko-KR')),
+            datasets: [
+              {
+                label: 'Cumulative PnL',
+                data: data.map((d) => d.pnl),
+                borderColor: '#58a6ff',
+                backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 2,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+            },
+            scales: {
+              x: {
+                grid: { color: '#30363d' },
+                ticks: { color: '#8b949e' },
+              },
+              y: {
+                grid: { color: '#30363d' },
+                ticks: { color: '#8b949e' },
+              },
+            },
+          },
+        });
+      }
+
+      async function loadDailyPnl() {
+        const days = document.getElementById('timeRange').value;
+        const data = await fetchData(`/api/daily-pnl?days=${days}`);
+
+        if (dailyPnlChart) dailyPnlChart.destroy();
+
+        const ctx = document.getElementById('dailyPnlChart').getContext('2d');
+        dailyPnlChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: data.map((d) => d.date.slice(5)),
+            datasets: [
+              {
+                label: 'Daily PnL',
+                data: data.map((d) => d.pnl),
+                backgroundColor: data.map((d) => (d.pnl >= 0 ? '#3fb950' : '#f85149')),
+                borderRadius: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { color: '#8b949e' },
+              },
+              y: {
+                grid: { color: '#30363d' },
+                ticks: { color: '#8b949e' },
+              },
+            },
+          },
+        });
+      }
+
+      async function loadDecisions() {
+        const symbol = document.getElementById('symbolFilter').value;
+        decisionsData = await fetchData(`/api/decisions?limit=50&symbol=${symbol}`);
+
+        const tbody = document.querySelector('#decisionsTable tbody');
+        tbody.innerHTML = decisionsData
+          .map(
+            (d, index) => `
+        <tr>
+          <td class="time-ago">${timeAgo(d.created_at)}</td>
+          <td class="symbol-tag">${d.symbol}</td>
+          <td class="price-cell">${formatNumber(Math.round(d.current_price || 0))}</td>
+          <td class="indicator">
+            RSI <span class="indicator-value">${(d.rsi || 0).toFixed(1)}</span>
+            SMA <span class="indicator-value">${formatNumber(Math.round(d.sma20 || 0))}</span>
+            EMA <span class="indicator-value">${formatNumber(Math.round(d.ema9 || 0))}</span>
+          </td>
+          <td>
+            <span class="signal-badge ${(d.signal_type || '').toLowerCase()} ${(d.signal_direction || '').toLowerCase()}">
+              ${d.signal_direction === 'UP' ? '📈' : '📉'} ${d.signal_type || '-'}
+            </span>
+          </td>
+          <td><span class="badge ${d.should_trade ? d.side?.toLowerCase() || 'open' : ''}">${d.should_trade ? d.side : 'SKIP'}</span></td>
+          <td>
+            <div class="confidence-bar" title="${d.confidence}%">
+              <div class="confidence-fill" style="width: ${d.confidence}%; background: ${getConfidenceColor(d.confidence)}"></div>
+            </div>
+          </td>
+          <td><div class="reasoning" onclick="openDecisionModal(${index})">${truncate(d.reasoning, 25) || '-'}</div></td>
+        </tr>
+      `,
+          )
+          .join('');
+      }
+
+      function truncate(str, len) {
+        if (!str) return '';
+        return str.length > len ? str.substring(0, len) + '...' : str;
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      let decisionsData = [];
+
+      function openDecisionModal(index) {
+        const d = decisionsData[index];
+        if (!d) return;
+
+        document.getElementById('modalSymbol').textContent = d.symbol;
+        document.getElementById('modalSignal').innerHTML = `
+          <span class="signal-badge ${(d.signal_type || '').toLowerCase()} ${(d.signal_direction || '').toLowerCase()}">
+            ${d.signal_direction === 'UP' ? '📈' : '📉'} ${d.signal_type || '-'}
+          </span>
+        `;
+        document.getElementById('modalPrice').textContent =
+          formatNumber(Math.round(d.current_price || 0)) + ' ₩';
+        document.getElementById('modalRsi').textContent = (d.rsi || 0).toFixed(2);
+        document.getElementById('modalRsi').style.color =
+          d.rsi < 30
+            ? 'var(--accent-green)'
+            : d.rsi > 70
+              ? 'var(--accent-red)'
+              : 'var(--text-primary)';
+        document.getElementById('modalSma').textContent = formatNumber(Math.round(d.sma20 || 0));
+        document.getElementById('modalEma').textContent = formatNumber(Math.round(d.ema9 || 0));
+        document.getElementById('modalConfidence').textContent = (d.confidence || 0) + '%';
+        document.getElementById('modalConfidence').style.color = getConfidenceColor(
+          d.confidence || 0,
+        );
+        document.getElementById('modalDecision').innerHTML = d.should_trade
+          ? `<span class="badge ${d.side?.toLowerCase() || ''}">${d.side}</span>`
+          : '<span style="color: var(--text-secondary)">SKIP</span>';
+        document.getElementById('modalReasoning').textContent =
+          d.reasoning || 'No reasoning provided';
+        document.getElementById('modalTime').textContent = new Date(d.created_at).toLocaleString(
+          'ko-KR',
+        );
+
+        document.getElementById('decisionModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeModal(event) {
+        if (event && event.target !== event.currentTarget) return;
+        document.getElementById('decisionModal').classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeModal();
+      });
+
+      async function loadTrades() {
+        const symbol = document.getElementById('symbolFilter').value;
+        const data = await fetchData(`/api/trades?limit=50&symbol=${symbol}`);
+
+        const tbody = document.querySelector('#tradesTable tbody');
+        tbody.innerHTML = data
+          .map(
+            (t) => `
+        <tr>
+          <td class="time-ago">${timeAgo(t.created_at)}</td>
+          <td class="symbol-tag">${t.symbol}</td>
+          <td><span class="badge ${t.side.toLowerCase()}">${t.side}</span></td>
+          <td><span class="badge ${t.action.toLowerCase()}">${t.action}</span></td>
+          <td class="price-cell">${formatNumber(Math.round(t.price || 0))}</td>
+          <td class="price-cell">${t.quantity?.toFixed(6) || '-'}</td>
+          <td class="pnl ${(t.pnl || 0) >= 0 ? 'positive' : 'negative'}">
+            ${t.pnl ? (t.pnl >= 0 ? '+' : '') + formatNumber(Math.round(t.pnl)) + ' ₩' : '-'}
+          </td>
+          <td style="font-size: 12px; color: var(--text-secondary)">${t.exit_reason || '-'}</td>
+        </tr>
+      `,
+          )
+          .join('');
+      }
+
+      let positionEvalsData = [];
+
+      async function loadPositionEvals() {
+        const symbol = document.getElementById('symbolFilter').value;
+        positionEvalsData = await fetchData(`/api/position-evals?limit=50&symbol=${symbol}`);
+
+        const tbody = document.querySelector('#positionEvalsTable tbody');
+        tbody.innerHTML = positionEvalsData
+          .map(
+            (e, index) => `
+        <tr>
+          <td class="time-ago">${timeAgo(e.created_at)}</td>
+          <td class="symbol-tag">${e.symbol}</td>
+          <td><span class="badge ${e.action === 'CLOSE' ? 'close' : e.action === 'TRIM_HALF' ? 'short' : ''}">${e.action}</span></td>
+          <td>
+            <div class="confidence-bar" title="${e.confidence}%">
+              <div class="confidence-fill" style="width: ${e.confidence}%; background: ${getConfidenceColor(e.confidence)}"></div>
+            </div>
+          </td>
+          <td class="price-cell">${formatNumber(Math.round(e.current_price || 0))}</td>
+          <td class="price-cell">${formatNumber(Math.round(e.entry_price || 0))}</td>
+          <td class="pnl ${(e.gross_pnl_pct || 0) >= 0 ? 'positive' : 'negative'}">${(e.gross_pnl_pct || 0) >= 0 ? '+' : ''}${(e.gross_pnl_pct || 0).toFixed(2)}%</td>
+          <td class="pnl ${(e.net_pnl_pct || 0) >= 0 ? 'positive' : 'negative'}">${(e.net_pnl_pct || 0) >= 0 ? '+' : ''}${(e.net_pnl_pct || 0).toFixed(2)}%</td>
+          <td>${e.holding_time_min || 0}m</td>
+          <td class="indicator-value" style="color: ${e.rsi < 30 ? 'var(--accent-green)' : e.rsi > 70 ? 'var(--accent-red)' : 'var(--text-primary)'}">${(e.rsi || 0).toFixed(1)}</td>
+          <td><div class="reasoning" onclick="openPositionEvalModal(${index})">${truncate(e.reasoning, 20) || '-'}</div></td>
+        </tr>
+      `,
+          )
+          .join('');
+      }
+
+      function openPositionEvalModal(index) {
+        const e = positionEvalsData[index];
+        if (!e) return;
+
+        document.getElementById('modalSymbol').textContent = e.symbol;
+        document.getElementById('modalSignal').innerHTML =
+          `<span class="badge ${e.action === 'CLOSE' ? 'close' : ''}">${e.action}</span>`;
+        document.getElementById('modalPrice').textContent =
+          formatNumber(Math.round(e.current_price || 0)) + ' ₩';
+        document.getElementById('modalRsi').textContent = (e.rsi || 0).toFixed(2);
+        document.getElementById('modalRsi').style.color =
+          e.rsi < 30
+            ? 'var(--accent-green)'
+            : e.rsi > 70
+              ? 'var(--accent-red)'
+              : 'var(--text-primary)';
+        document.getElementById('modalSma').textContent = formatNumber(Math.round(e.sma20 || 0));
+        document.getElementById('modalEma').textContent = formatNumber(Math.round(e.ema9 || 0));
+        document.getElementById('modalConfidence').textContent = (e.confidence || 0) + '%';
+        document.getElementById('modalConfidence').style.color = getConfidenceColor(
+          e.confidence || 0,
+        );
+        document.getElementById('modalDecision').innerHTML =
+          `<span class="badge ${e.action === 'CLOSE' ? 'close' : ''}">${e.action}</span>`;
+        document.getElementById('modalReasoning').textContent =
+          e.reasoning || 'No reasoning provided';
+        document.getElementById('modalTime').textContent = new Date(e.created_at).toLocaleString(
+          'ko-KR',
+        );
+
+        document.getElementById('decisionModal').classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function getConfidenceColor(conf) {
+        if (conf >= 70) return '#3fb950';
+        if (conf >= 50) return '#f0883e';
+        return '#f85149';
+      }
+
+      async function refreshData() {
+        await Promise.all([
+          loadBalance(),
+          loadStats(),
+          loadEquityCurve(),
+          loadDailyPnl(),
+          loadPositionEvals(),
+          loadDecisions(),
+          loadTrades(),
+        ]);
+      }
+
+      document.getElementById('timeRange').addEventListener('change', refreshData);
+      document.getElementById('symbolFilter').addEventListener('change', () => {
+        loadPositionEvals();
+        loadDecisions();
+        loadTrades();
+      });
+
+      refreshData();
+      setInterval(refreshData, 30000);
+    </script>
+  </body>
+</html>

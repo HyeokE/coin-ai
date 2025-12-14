@@ -1,0 +1,56 @@
+name: Deploy to Oracle Cloud
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Oracle Cloud
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USERNAME }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          port: 22
+          script: |
+            cd ~/auto-coin
+
+            echo "📥 Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            echo "🔐 Creating .env file..."
+            cat > .env << 'EOF'
+            UPBIT_ACCESS_KEY=${{ secrets.UPBIT_ACCESS_KEY }}
+            UPBIT_SECRET_KEY=${{ secrets.UPBIT_SECRET_KEY }}
+            DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
+            SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            SYMBOLS=${{ secrets.SYMBOLS }}
+            USE_WEBSOCKET=${{ secrets.USE_WEBSOCKET }}
+            CANDLE_TYPE=${{ secrets.CANDLE_TYPE }}
+            CANDLE_COUNT=${{ secrets.CANDLE_COUNT }}
+            INTERVAL_MS=${{ secrets.INTERVAL_MS }}
+            COOLDOWN_MS=${{ secrets.COOLDOWN_MS }}
+            DASHBOARD_PORT=3001
+            EOF
+
+            echo "📦 Installing dependencies..."
+            pnpm install --frozen-lockfile
+
+            echo "🔨 Building..."
+            pnpm build
+
+            echo "🔄 Restarting services with PM2..."
+            pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js
+
+            echo "✅ Deployment complete!"
+            pm2 status
